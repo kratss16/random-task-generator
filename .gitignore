@@ -1,0 +1,161 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import random
+import json
+import os
+
+GIT_REPO = "https://github.com/kratss16/random-task-generator.git"
+AUTHOR_NAME = "Константин Василов"
+
+DEFAULT_TASKS = [
+    {"text": "Прочитать статью", "type": "учёба"},
+    {"text": "Сделать зарядку", "type": "спорт"},
+    {"text": "Написать отчёт", "type": "работа"},
+    {"text": "Выучить 10 слов", "type": "учёба"},
+    {"text": "Пробежка 30 минут", "type": "спорт"},
+    {"text": "Позвонить клиенту", "type": "работа"}
+]
+
+DATA_FILE = "tasks.json"
+
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        return {"tasks": DEFAULT_TASKS.copy(), "history": []}
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return {"tasks": DEFAULT_TASKS.copy(), "history": []}
+            if "tasks" not in data:
+                data["tasks"] = DEFAULT_TASKS.copy()
+            if "history" not in data:
+                data["history"] = []
+            return data
+    except:
+        return {"tasks": DEFAULT_TASKS.copy(), "history": []}
+
+def save_data():
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump({"tasks": tasks, "history": history}, f, ensure_ascii=False, indent=4)
+
+data = load_data()
+tasks = data["tasks"]
+history = data["history"]
+
+root = tk.Tk()
+root.title("Генератор случайных задач")
+root.geometry("650x550")
+root.configure(bg="#f0f4f8")
+
+current_filter = "все"
+
+def get_filtered_tasks():
+    if current_filter == "все":
+        return tasks
+    return [t for t in tasks if t["type"] == current_filter]
+
+def update_task_listbox():
+    task_listbox.delete(0, tk.END)
+    for task in get_filtered_tasks():
+        task_listbox.insert(tk.END, f"[{task['type']}] {task['text']}")
+
+def update_history_listbox():
+    history_listbox.delete(0, tk.END)
+    for item in history[-10:][::-1]:
+        history_listbox.insert(tk.END, item)
+
+def add_task():
+    text = entry_new_task.get().strip()
+    task_type = combo_type.get()
+    if not text:
+        messagebox.showwarning("Ошибка", "Текст задачи не может быть пустым!")
+        return
+    tasks.append({"text": text, "type": task_type})
+    save_data()
+    update_task_listbox()
+    entry_new_task.delete(0, tk.END)
+
+def delete_task():
+    selection = task_listbox.curselection()
+    if not selection:
+        messagebox.showwarning("Ошибка", "Выберите задачу для удаления!")
+        return
+    index = selection[0]
+    filtered = get_filtered_tasks()
+    task_to_remove = filtered[index]
+    for i, t in enumerate(tasks):
+        if t["text"] == task_to_remove["text"] and t["type"] == task_to_remove["type"]:
+            tasks.pop(i)
+            break
+    save_data()
+    update_task_listbox()
+
+def apply_filter():
+    global current_filter
+    current_filter = filter_var.get()
+    update_task_listbox()
+
+def generate_task():
+    available = get_filtered_tasks()
+    if not available:
+        messagebox.showwarning("Нет задач", "Нет доступных задач для генерации!")
+        return
+    random_task = random.choice(available)
+    history.append(f"[{random_task['type']}] {random_task['text']}")
+    save_data()
+    update_history_listbox()
+    messagebox.showinfo("Случайная задача", f"🎯 ВАША ЗАДАЧА:\n\n{random_task['text']}")
+
+tk.Label(root, text="🎲 Генератор случайных задач", font=("Arial", 18, "bold"), bg="#f0f4f8", fg="#2c3e50").pack(pady=10)
+
+frame_add = tk.Frame(root, bg="#f0f4f8")
+frame_add.pack(pady=5)
+
+tk.Label(frame_add, text="Новая задача:", bg="#f0f4f8", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
+entry_new_task = tk.Entry(frame_add, width=30, font=("Arial", 10))
+entry_new_task.pack(side=tk.LEFT, padx=5)
+
+combo_type = ttk.Combobox(frame_add, values=["учёба", "спорт", "работа"], width=10)
+combo_type.set("учёба")
+combo_type.pack(side=tk.LEFT, padx=5)
+
+tk.Button(frame_add, text="➕ Добавить", command=add_task, bg="#27ae60", fg="white", font=("Arial", 9)).pack(side=tk.LEFT, padx=5)
+
+frame_filter = tk.Frame(root, bg="#f0f4f8")
+frame_filter.pack(pady=10)
+
+tk.Label(frame_filter, text="Фильтр:", bg="#f0f4f8", font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
+
+filter_var = tk.StringVar(value="все")
+for t in ["все", "учёба", "спорт", "работа"]:
+    tk.Radiobutton(frame_filter, text=t, variable=filter_var, value=t, bg="#f0f4f8", command=apply_filter).pack(side=tk.LEFT, padx=5)
+
+frame_lists = tk.Frame(root, bg="#f0f4f8")
+frame_lists.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
+
+left_frame = tk.Frame(frame_lists, bg="#f0f4f8")
+left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+
+tk.Label(left_frame, text="📋 Список задач:", font=("Arial", 10, "bold"), bg="#f0f4f8").pack(anchor="w")
+task_listbox = tk.Listbox(left_frame, height=12, font=("Arial", 10))
+task_listbox.pack(fill=tk.BOTH, expand=True)
+
+right_frame = tk.Frame(frame_lists, bg="#f0f4f8")
+right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+tk.Label(right_frame, text="📜 История (последние 10):", font=("Arial", 10, "bold"), bg="#f0f4f8").pack(anchor="w")
+history_listbox = tk.Listbox(right_frame, height=12, font=("Arial", 9))
+history_listbox.pack(fill=tk.BOTH, expand=True)
+
+frame_buttons = tk.Frame(root, bg="#f0f4f8")
+frame_buttons.pack(pady=10)
+
+tk.Button(frame_buttons, text="🎲 Сгенерировать задачу", command=generate_task, bg="#3498db", fg="white", font=("Arial", 11, "bold"), width=20).pack(side=tk.LEFT, padx=10)
+tk.Button(frame_buttons, text="🗑 Удалить выбранную", command=delete_task, bg="#e74c3c", fg="white", font=("Arial", 10), width=15).pack(side=tk.LEFT, padx=10)
+
+tk.Label(root, text=f"👤 Автор: {AUTHOR_NAME} | 📁 Репозиторий: {GIT_REPO}", font=("Arial", 8), bg="#f0f4f8", fg="#7f8c8d").pack(side=tk.BOTTOM, pady=10)
+
+update_task_listbox()
+update_history_listbox()
+
+root.mainloop()
